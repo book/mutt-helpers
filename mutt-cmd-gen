@@ -1,0 +1,49 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Email::Simple;
+
+my @magic = (    # ways to pick an address
+    [ 'list-id', qr/(<.*>)/, '~hlist-id:.*%s' ],
+    [ 'from',    qr/<(.*)>/, '~f%s|~C%s' ],
+    [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
+);
+
+# pick up command
+my $cmd = shift || 'limit';
+
+# create email from STDIN
+my $email = Email::Simple->new( do { local $/; <>; } );
+
+# pick up the address
+my ( $addr, $fmt );
+for (@magic) {
+    ( my $header, my $re, $fmt ) = @$_;
+    ($addr) = ( $email->header($header) || '' ) =~ $re;
+    last if $addr;
+}
+
+# spit out the requested Mutt command
+if ($addr) {
+    my $expr = sprintf $fmt, ($addr) x ($fmt =~ y/%//);
+    printf "\\<$cmd\\>%s\\<enter\\>", $expr;
+}
+
+__END__
+
+# Usage:
+
+# pick up a temporary file when starting Mutt
+set my_tmp_file=`mktemp --tmpdir mutt-XXXXXXXX`
+
+# tag-pattern
+macro index,pager ,t "<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen tag-pattern > $my_tmp_file<enter>\
+<enter-command> push \`cat $my_tmp_file\`<enter>\
+<enter-command> set wait_key=yes<enter>" "Magically limit to all related messages"
+
+# limit
+macro index,pager ,l "<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen limit > $my_tmp_file<enter>\
+<enter-command> push \`cat $my_tmp_file\`<enter>\
+<enter-command> set wait_key=yes<enter>" "Magically limit to all related messages"
