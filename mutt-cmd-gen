@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Email::Simple;
+use Email::MIME;
 
 my %pattern = (    # ways to pick an address and a pattern
     wide => [
@@ -19,7 +19,7 @@ die "Unknown pattern type `$pat`\n" if !exists $pattern{$pat};
 my @patterns = @{ $pattern{$pat} };
 
 # create email from STDIN
-my $email = Email::Simple->new( do { local $/; <>; } );
+my $email = Email::MIME->new( do { local $/; <>; } );
 
 # pick up the address
 my ( $addr, $fmt );
