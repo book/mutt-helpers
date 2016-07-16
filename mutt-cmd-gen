@@ -31,6 +31,8 @@ for (@patterns) {
 
 # spit out the requested Mutt command
 if ($addr) {
+    $addr =~ s/([](.+)[])/\\\\\\\\$1/g;    # escape what needs to be
+    $addr =~ s/ +/.*/g;
     my $expr = sprintf $fmt, ($addr) x ($fmt =~ y/%//);
     printf "\\<$cmd\\>%s\\<enter\\>", $expr;
 }
