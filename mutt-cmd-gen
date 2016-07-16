@@ -25,7 +25,7 @@ my $email = Email::MIME->new( do { local $/; <>; } );
 my ( $addr, $fmt );
 for (@patterns) {
     ( my $header, my $re, $fmt ) = @$_;
-    ($addr) = ( $email->header($header) || '' ) =~ $re;
+    ($addr) = ( lc $email->header($header) || '' ) =~ $re;
     last if $addr;
 }
 
