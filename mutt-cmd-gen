@@ -3,11 +3,17 @@ use strict;
 use warnings;
 use Email::MIME;
 
+use 5.010;             # because \K
+no warnings 'utf8';    # assume it's ok to dump decoded characters to STDOUT
+
 my %pattern = (    # ways to pick an address and a pattern
     wide => [
         [ 'list-id', qr/(<.*>)/, '~hlist-id:.*%s' ],
         [ 'from',    qr/<(.*)>/, '~f%s|~C%s' ],
         [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
+    ],
+    narrow => [
+        [ 'subject', qr/(?:Re:|Fwd:)? *\K(.*)/i, '~s\\"%s\\"' ],
     ],
 );
 
