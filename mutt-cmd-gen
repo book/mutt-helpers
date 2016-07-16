@@ -3,21 +3,27 @@ use strict;
 use warnings;
 use Email::Simple;
 
-my @magic = (    # ways to pick an address
-    [ 'list-id', qr/(<.*>)/, '~hlist-id:.*%s' ],
-    [ 'from',    qr/<(.*)>/, '~f%s|~C%s' ],
-    [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
+my %pattern = (    # ways to pick an address and a pattern
+    wide => [
+        [ 'list-id', qr/(<.*>)/, '~hlist-id:.*%s' ],
+        [ 'from',    qr/<(.*)>/, '~f%s|~C%s' ],
+        [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
+    ],
 );
 
-# pick up command
+# pick up command and pattern
 my $cmd = shift || 'limit';
+my $pat = shift || 'wide';
+
+die "Unknown pattern type `$pat`\n" if !exists $pattern{$pat};
+my @patterns = @{ $pattern{$pat} };
 
 # create email from STDIN
 my $email = Email::Simple->new( do { local $/; <>; } );
 
 # pick up the address
 my ( $addr, $fmt );
-for (@magic) {
+for (@patterns) {
     ( my $header, my $re, $fmt ) = @$_;
     ($addr) = ( $email->header($header) || '' ) =~ $re;
     last if $addr;
