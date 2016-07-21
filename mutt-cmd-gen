@@ -15,6 +15,9 @@ my %pattern = (    # ways to pick an address and a pattern
     narrow => [
         [ 'subject', qr/(?:Re:|Fwd:)? *\K(.*)/i, '~s\\"%s\\"' ],
     ],
+    thread => [
+        [ 'message-id', qr/(<.*>)/, '~(~hmessage-id:.*%s)' ],
+    ],
 );
 
 # pick up command and pattern
