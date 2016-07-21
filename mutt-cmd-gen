@@ -16,7 +16,7 @@ my %pattern = (    # ways to pick an address and a pattern
         [ 'subject', qr/(?:Re:|Fwd:)? *\K(.*)/i, '~s\\"%s\\"' ],
     ],
     thread => [
-        [ 'message-id', qr/(<.*>)/, '~(~hmessage-id:.*%s)' ],
+        [ 'message-id', qr/(<.*>)/, '~hreferences:.*%s|~hmessage-id:.*%s' ],
     ],
 );
 
