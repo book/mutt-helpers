@@ -13,7 +13,7 @@ my %pattern = (    # ways to pick an address and a pattern
         [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
     ],
     narrow => [
-        [ 'subject', qr/(?:Re:|Fwd:)? *\K(.*)/i, '~s\\"%s\\"' ],
+        [ 'subject', qr/^ *(?:(?:Re:|Fwd:|\[.*?\]) *)*\K(.*)/i, '~s\\"%s\\"' ],
     ],
     thread => [
         [ 'message-id', qr/(<.*>)/, '~hreferences:.*%s|~hmessage-id:.*%s' ],
