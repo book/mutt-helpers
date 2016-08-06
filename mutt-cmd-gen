@@ -51,16 +51,30 @@ __END__
 # Usage:
 
 # pick up a temporary file when starting Mutt
-set my_tmp_file=`mktemp --tmpdir mutt-XXXXXXXX`
+set my_tmp_mutt=`mktemp --tmpdir mutt-XXXXXXXX`
 
-# tag-pattern
-macro index,pager ,t "<enter-command> set wait_key=no<enter>\
-<pipe-message>mutt-cmd-gen tag-pattern > $my_tmp_file<enter>\
-<enter-command> push \`cat $my_tmp_file\`<enter>\
-<enter-command> set wait_key=yes<enter>" "Magically limit to all related messages"
+# apply to wide selection
+macro index ,l "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen limit wide > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (wide)"
 
-# limit
-macro index,pager ,l "<enter-command> set wait_key=no<enter>\
-<pipe-message>mutt-cmd-gen limit > $my_tmp_file<enter>\
-<enter-command> push \`cat $my_tmp_file\`<enter>\
-<enter-command> set wait_key=yes<enter>" "Magically limit to all related messages"
+macro index ,t "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> unset wait_key<enter>\
+<pipe-message>mutt-cmd-gen tag-pattern wide > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (wide)"
+
+# apply to narrow selection
+macro index ,L "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen limit narrow > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (narrow)"
+
+macro index ,T "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen tag-pattern narrow > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (narrow)"
