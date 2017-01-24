@@ -7,12 +7,29 @@ use 5.010;             # because \K
 no warnings 'utf8';    # assume it's ok to dump decoded characters to STDOUT
 
 my %pattern = (    # ways to pick an address and a pattern
-    wide => [
-        [ 'list-id', qr/(<.*>)/, '~hlist-id:.*%s' ],
-        [ 'from',    qr/<(.*)>/, '~f%s|~C%s' ],
-        [ 'from',    qr/(.*)/,   '~f%s|~C%s' ],        # fallback
+    list => [
+        [ 'list-id', qr/(<.*>)/,  '~hlist-id:.*%s' ],
+        [ 'sender',  qr/(<.*>)/,  '~hsender:.*%s' ],
+        [ 'to',      qr/<(.*?)>/, '~f%s|~C%s' ],
+        [ 'to',      qr/(\S+)/,   '~f%s|~C%s' ],        # fallback
+        [ 'from',    qr/<(.*?)>/, '~f%s|~C%s' ],
+        [ 'from',    qr/(\S+)/,   '~f%s|~C%s' ],        # fallback
     ],
-    narrow => [
+    negate_list => [
+        [ 'list-id', qr/(<.*>)/,  '!~hlist-id:.*%s' ],
+        [ 'sender',  qr/(<.*>)/,  '!~hsender:.*%s' ],
+        [ 'to',      qr/<(.*?)>/, '!~f%s|!~C%s' ],
+        [ 'to',      qr/(\S+)/,   '!~f%s|!~C%s' ],       # fallback
+    ],
+    from => [
+        [ 'from', qr/<(.*?)>/, '~f%s|~C%s' ],
+        [ 'from', qr/(\S+)/,   '~f%s|~C%s' ],            # fallback
+    ],
+    to => [
+        [ 'to', qr/<(.*?)>/, '~f%s|~C%s' ],
+        [ 'to', qr/(\S+)/,   '~f%s|~C%s' ],              # fallback
+    ],
+    subject => [
         [ 'subject', qr/^\s*(?:(?:Re:|Fwd:|\[.*?\])\s*)*\K(.*)/i, '~s\\"%s\\"' ],
     ],
     thread => [
@@ -31,18 +48,24 @@ my @patterns = @{ $pattern{$pat} };
 my $email = Email::MIME->new( do { local $/; <>; } );
 
 # pick up the address
-my ( $addr, $fmt );
+my ( @addr, $fmt );
 for (@patterns) {
     ( my $header, my $re, $fmt ) = @$_;
-    ($addr) = ( lc $email->header($header) || '' ) =~ $re;
-    last if $addr;
+    @addr = ( lc $email->header($header) || '' ) =~ /$re/g;
+    last if @addr;
 }
 
 # spit out the requested Mutt command
-if ($addr) {
-    $addr =~ s/([](.+)[])/\\\\\\\\$1/g;    # escape what needs to be
-    $addr =~ s/ +/.*/g;
-    my $expr = sprintf $fmt, ($addr) x ( $fmt =~ y/%// );
+if (@addr) {
+    for (@addr) {
+        s/([](.+|$)[])/\\\\\\\\$1/g;    # escape what needs to be
+        y/`/./;                         # escape dangerous characters
+        s/ +/.*/g;
+        s/(?:\.\*)+/.*/g;               # clean up somewhat
+    }
+    my $count = $fmt =~ y/%//;
+    $fmt = join '|', ($fmt) x @addr;
+    my $expr = sprintf $fmt, (@addr) x $count;
     printf qq{"\\<$cmd\\>%s\\<enter\\>"}, $expr;
 }
 
