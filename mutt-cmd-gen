@@ -9,6 +9,7 @@ no warnings 'utf8';    # assume it's ok to dump decoded characters to STDOUT
 my %pattern = (    # ways to pick an address and a pattern
     list => [
         [ 'list-id', qr/(<.*>)/,  '~hlist-id:.*%s' ],
+        [ 'x-gitlab-project', qr/(\S+)/, "~h'x-gitlab-project: %s'" ],
         [ 'sender',  qr/(<.*>)/,  '~hsender:.*%s' ],
         [ 'to',      qr/<(.*?)>/, '~f%s|~C%s' ],
         [ 'to',      qr/(\S+)/,   '~f%s|~C%s' ],        # fallback
