@@ -51,7 +51,7 @@ my $email = Email::MIME->new( do { local $/; <>; } );
 my ( @addr, $fmt );
 for (@patterns) {
     ( my $header, my $re, $fmt ) = @$_;
-    @addr = ( lc $email->header($header) || '' ) =~ /$re/g;
+    @addr = lc( $email->header($header) || '' ) =~ /$re/g;
     last if @addr;
 }
 
