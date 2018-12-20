@@ -67,6 +67,10 @@ if (@addr) {
     my $count = $fmt =~ y/%//;
     $fmt = join '|', ($fmt) x @addr;
     my $expr = sprintf $fmt, (@addr) x $count;
+    if ( substr( $cmd, -1 ) eq '+' ) {
+        chop $cmd;
+        $expr = "\\<history-up\\>$expr";
+    }
     printf qq{"\\<$cmd\\>%s\\<enter\\>"}, $expr;
 }
 
