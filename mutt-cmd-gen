@@ -40,7 +40,7 @@ my %pattern = (    # ways to pick an address and a pattern
 
 # pick up command and pattern
 my $cmd = shift || 'limit';
-my $pat = shift || 'wide';
+my $pat = shift || 'list';
 
 die "Unknown pattern type `$pat`\n" if !exists $pattern{$pat};
 my @patterns = @{ $pattern{$pat} };
@@ -77,28 +77,46 @@ __END__
 # pick up a temporary file when starting Mutt
 set my_tmp_mutt=`mktemp --tmpdir mutt-XXXXXXXX`
 
-# apply to wide selection
-macro index ,l "<enter-command> set my_wait_key=$wait_key<enter>\
+# apply to "list" selection
+macro index ,ll "<enter-command> set my_wait_key=$wait_key<enter>\
 <enter-command> set wait_key=no<enter>\
-<pipe-message>mutt-cmd-gen limit wide > $my_tmp_mutt<enter>\
+<pipe-message>mutt-cmd-gen limit list > $my_tmp_mutt<enter>\
 <enter-command> push \`cat $my_tmp_mutt\`<enter>\
-<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (wide)"
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (list)"
 
-macro index ,t "<enter-command> set my_wait_key=$wait_key<enter>\
+macro index ,tl "<enter-command> set my_wait_key=$wait_key<enter>\
 <enter-command> unset wait_key<enter>\
-<pipe-message>mutt-cmd-gen tag-pattern wide > $my_tmp_mutt<enter>\
+<pipe-message>mutt-cmd-gen tag-pattern list > $my_tmp_mutt<enter>\
 <enter-command> push \`cat $my_tmp_mutt\`<enter>\
-<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (wide)"
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (list)"
 
-# apply to narrow selection
-macro index ,L "<enter-command> set my_wait_key=$wait_key<enter>\
-<enter-command> set wait_key=no<enter>\
-<pipe-message>mutt-cmd-gen limit narrow > $my_tmp_mutt<enter>\
+macro index ,dl "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> unset wait_key<enter>\
+<pipe-message>mutt-cmd-gen delete-pattern list > $my_tmp_mutt<enter>\
 <enter-command> push \`cat $my_tmp_mutt\`<enter>\
-<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (narrow)"
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically delete all related messages (list)"
 
-macro index ,T "<enter-command> set my_wait_key=$wait_key<enter>\
+macro index ,!ll "<enter-command> set my_wait_key=$wait_key<enter>\
 <enter-command> set wait_key=no<enter>\
-<pipe-message>mutt-cmd-gen tag-pattern narrow > $my_tmp_mutt<enter>\
+<pipe-message>mutt-cmd-gen limit negate_list > $my_tmp_mutt<enter>\
 <enter-command> push \`cat $my_tmp_mutt\`<enter>\
-<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (narrow)"
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to NOT related messages (list)"
+
+# apply to "subject" selection
+macro index ,ls "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen limit subject > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically limit to all related messages (subject)"
+
+macro index ,ts "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen tag-pattern subject > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically tag all related messages (sibject)"
+
+macro index ,ds "<enter-command> set my_wait_key=$wait_key<enter>\
+<enter-command> set wait_key=no<enter>\
+<pipe-message>mutt-cmd-gen delete-pattern subject > $my_tmp_mutt<enter>\
+<enter-command> push \`cat $my_tmp_mutt\`<enter>\
+<enter-command> set wait_key=\$my_wait_key<enter>" "Magically delete all related messages (subject)"
