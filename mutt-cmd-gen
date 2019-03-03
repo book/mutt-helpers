@@ -11,6 +11,7 @@ my %pattern = (    # ways to pick an address and a pattern
         [ 'list-id', qr/(<.*>)/,  '~hlist-id:.*%s' ],
         [ 'x-gitlab-project', qr/(\S+)/, "~h'x-gitlab-project: %s'" ],
         [ 'sender',  qr/(<.*>)/,  '~hsender:.*%s' ],
+        [ 'sender',  qr/(\S+)/,   '~hsender:.*%s' ],
         [ 'to',      qr/<(.*?)>/, '~f%s|~C%s' ],
         [ 'to',      qr/(\S+)/,   '~f%s|~C%s' ],        # fallback
         [ 'from',    qr/<(.*?)>/, '~f%s|~C%s' ],
