@@ -3,9 +3,13 @@ use 5.024;
 use warnings;
 use Sys::Hostname;
 use Email::MIME;
+use Getopt::Long;
+
+GetOptions( \my %option, 'list_id|list-id=s' )
+  or die "Usage: mutt-ezmlm-save [ --list-id <ID> ] mailbox\n";
 
 my $maildir = shift;
-die "No maildir\n" unless $maildir;
+die "No maildir given\n" unless $maildir;
 
 # create email from STDIN
 my $email = Email::MIME->new(
@@ -13,12 +17,14 @@ my $email = Email::MIME->new(
 );
 
 # parse the message body for useful information
-my $attached = ( $email->subparts )[1];
+my $attached = Email::MIME->new( ( $email->subparts )[1]->body );
+$attached->header_str_set( 'List-Id' => $option{list_id} )
+  if $option{list_id};
 
-# dump the email in Maildir 
-my $file = sprintf "%s/new/%d.%d_%d.%s",
-   $maildir, time, $$, 1245, hostname;
+
+# dump the email in Maildir
+my $file = sprintf "%s/new/%d.%d_%d.%s", $maildir, time, $$, 1245, hostname;
 open my $fh, '>', $file or die "Can't open $file for saving\n";
-print $fh $attached->body;
+print $fh $attached->as_string;
 
 say "Saved message to $file";
