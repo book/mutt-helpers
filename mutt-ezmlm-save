@@ -1,29 +1,47 @@
 #!/usr/bin/env perl
 use 5.024;
 use warnings;
+use Getopt::Long;
+use File::Spec;
 use Sys::Hostname;
 use Email::MIME;
-use Getopt::Long;
+use Config::INI::Reader;
 
-GetOptions( \my %option, 'list_id|list-id=s' )
-  or die "Usage: mutt-ezmlm-save [ --list-id <ID> ] mailbox\n";
+my %option = (
+    config => File::Spec->catfile( $ENV{HOME}, '.ezmlm' ),
+);
 
-my $maildir = shift;
-die "No maildir given\n" unless $maildir;
+GetOptions( \%option, 'config=s' )
+  or die "Usage: mutt-ezmlm-save [ --config <config-file> ]\n";
+
+my $ezmlm = Config::INI::Reader->read_file( $option{config} );
 
 # create email from STDIN
 my $email = Email::MIME->new(
     do { local $/; <>; }
 );
 
+my ( $list, $digest ) =
+  $email->header_str('Subject') =~ /\A(\S+) Digest of: get.([0-9]+)\z/;
+
+my $maildir = $ezmlm->{_}{maildir}
+  // die "No maildir defined in $option{config}";
+my $config = $ezmlm->{$list} // die "Unknown list $list\n";
+my $folder = $config->{folder} // die "No folder defined for $list";
+
+die "No folder defined for $list"
+  unless exists $config->{folder};
+
 # parse the message body for useful information
 my $attached = Email::MIME->new( ( $email->subparts )[1]->body );
-$attached->header_str_set( 'List-Id' => $option{list_id} )
-  if $option{list_id};
 
+$attached->header_str_set( 'List-Id' => $config->{list_id} )
+  if $config->{list_id};
+$attached->header_str_set( 'X-List-Archive' => sprintf( $config->{list_archive}, $digest ) )
+  if $config->{list_archive};
 
 # dump the email in Maildir
-my $file = sprintf "%s/new/%d.%d_%d.%s", $maildir, time, $$, 1245, hostname;
+my $file = sprintf "%s/%s/new/%d.%d_%d.%s", $maildir, $folder, time, $$, 1245, hostname;
 open my $fh, '>', $file or die "Can't open $file for saving\n";
 print $fh $attached->as_string;
 
