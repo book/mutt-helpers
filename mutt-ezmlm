@@ -1,0 +1,212 @@
+#!/usr/bin/env perl
+use 5.028;
+use warnings;
+use experimental 'signatures';
+
+use Pod::Usage;
+use Getopt::Long;
+use File::Spec;
+use Sys::Hostname;
+use Email::MIME;
+use Config::INI::Reader;
+use News::NNTPClient;
+
+# option processing
+my %option = ( config => File::Spec->catfile( $ENV{HOME}, '.ezmlm' ), );
+
+GetOptions(
+    \%option,
+    'config=s',                 # config file
+    'quiet',                    # no status messages
+    'from_email|from-email',    # input is an ezmlm message on STDIN
+    'help',                     # help
+    'stdout',                   # dump emails on STDOUT
+) or pod2usage(1);
+
+pod2usage(0) if $option{help};
+
+# config validation
+my $ezmlm   = Config::INI::Reader->read_file( $option{config} );
+my $maildir = $ezmlm->{_}{maildir} // '~/Maildir';
+$maildir =~ s{\A~/}{$ENV{HOME}/};
+
+my $nntp_server = $ezmlm->{_}{nntp}
+  // die "No nntp server defined in $option{config}";
+
+my %group2list;
+for my $list ( grep $_ ne '_', keys %$ezmlm ) {
+    exists $ezmlm->{$list}{$_}
+      or die "No '$_' entry in section '$list' of '$option{config}'\n"
+      for qw( folder group );
+    $group2list{ $ezmlm->{$list}{group} } = $list;
+}
+
+# setup NNTP client
+my $nntp = News::NNTPClient->new( split /:/, $nntp_server );
+
+if ( $option{from_email} ) {
+
+    # parse the message body for useful information
+    my ( $list, @missing );
+    while (<STDIN>) {
+        if ( /Here are the message numbers:/ .. /--- Enclosed/ and /(\d+)/ ) {
+            push @missing, $1;
+        }
+        elsif (m{<([^>]+)-get\.123_145\@[^>]+>}) {
+            $list = $1;
+        }
+    }
+
+    die "Unknown list '$list' requested (not listed in '$option{config}')\n"
+      if !exists $ezmlm->{$list};
+
+    # create our list of arguments
+    warn "Ignoring the following command-line arguments:\n  @ARGV\n"
+      if @ARGV;
+    @ARGV = ( $ezmlm->{$list}{group}, @missing );
+}
+
+# process input by reading items from @ARGV first,
+my $next = @ARGV > 1    # group id ...
+  ? sub { my $item = shift @ARGV }
+  : sub {
+    return shift @ARGV if @ARGV;    # group
+    if ( defined( my $line = <STDIN> ) ) { chomp $line; return $line; }
+    return;
+  };
+
+my $counter  = 1;
+my $hostname = hostname;
+my $config;
+
+while ( my $arg = $next->() ) {
+    if ( $arg =~ /\A[0-9]+\z/ ) {
+        die "No group defined yet" unless $config;
+
+        # read and save the article
+        my $article = $nntp->article($arg)
+          // die "Article $arg not found in $config->{group}\n";
+        my $email = Email::MIME->new( join '', @$article );
+
+        # delete NNTP-specific headers: Newsgroups Path
+        # (but keep Xref, as it contains the message number)
+        $email->header_str_set($_) for qw( Newsgroups Path );
+
+        # update useful mailing-list headers
+        $email->header_str_set( 'List-Id' => $config->{list_id} )
+          if $config->{list_id};
+        $email->header_str_set(
+            'X-List-Archive' => sprintf( $config->{list_archive}, $arg ) )
+          if $config->{list_archive};
+
+        if ( $option{stdout} ) { say scalar $email->as_string; }
+        else {
+            my $file = Maildir::save( $maildir, $config->{folder}, $email );
+            say sprintf 'Created %s in %s with message %s %s', $file,
+              $config->{folder}, $arg, $email->header_str('Message-Id')
+              unless $option{quiet};
+        }
+    }
+
+    # ranges are OK
+    elsif ( $arg =~ /\A([0-9]+)\s*(?:-|\.\.)\s*([0-9]+)\z/ ) {
+        unshift @ARGV, $1 .. $2;
+    }
+
+    # switch group and list
+    else {
+        my $list =
+            exists $ezmlm->{$arg}    ? $arg
+          : exists $group2list{$arg} ? $group2list{$arg}
+          : die "Unknown group or list '$arg' requested (not listed in '$option{config}')\n";
+        $config = $ezmlm->{$list};
+        $nntp->group( $ezmlm->{$list}{group} );
+    }
+}
+
+package Maildir;
+
+sub save ( $maildir, $folder, $email ) {
+
+    # build the uniq Maildir email
+    my $file = sprintf "%d.%d_%d.%s", time, $$, $counter++, $hostname;
+
+    # create the mail in tmp/
+    my $tmp = File::Spec->catfile( $maildir, $folder, 'tmp', $file );
+    open my $fh, '>', $tmp or die "Can't open $tmp for saving\n";
+    print $fh $email->as_string;
+    close $fh;
+
+    # move the mail to new/
+    my $new = File::Spec->catfile( $maildir, $folder, 'new', $file );
+    rename $tmp, $new or die "Couldn't rename $tmp to $new: $!";
+
+    return $file;
+}
+
+__END__
+
+=head1 NAME
+
+mutt-ezmlm - Download ezmlm emails from NNTP archives
+
+=head1 SYNOPSIS
+
+  mutt-ezmlm [ options ] [ arguments ]
+
+=head1 OPTIONS
+
+  --config <file>    Configuration file (default: $HOME/.ezmlm)
+  --from-email       Process an ezmlm warning email on STDIN
+  --quiet            Silence progress output
+  --stdout           Dump the emails to STDOUT instead of saving them
+
+Arguments can be given on the command line or standard intput.
+They are read in order, and conists of a newsgroup name followed
+by the ids to save in Maildir.
+
+=head1 DESCRIPTION
+
+The Perl mailing-lists (and likely others) are managed with ezmlm,
+and some archives are available via NNTP.
+
+B<mutt-ezmlm> is meant to download the request emails and save
+them to a Maildir.
+
+=head1 CONFIGURATION
+
+Example configuration for C<perl5-porters>:
+
+    ; maildir = ~/Maildir
+    nntp = nntp.perl.org
+
+    [perl5-porters]
+    folder = perl.p5p
+    group = perl.perl5.porters
+    list_id = <perl5-porters.perl.org>
+    list_archive = <http://nntp.perl.org/group/perl.perl5.porters/%d>
+
+Each section is a mailing-list name.
+
+The C<folder> and C<group> entries are required, and respectively
+represent the Maildir folder name in which to save the downloaded
+emails, and the newsgroup from which to get it.
+
+When set, C<list_id> will add a C<List-Id> header to the email,
+and C<list_archive> will be used as a format string to add
+the C<X-List-Archive> header.
+
+=head1 MUTT INTEGRATION
+
+The I<--from-email> option was written for nicely integrating with Mutt.
+
+Add a macro to pipe the content of an "ezmlm warning" email to the
+command, and if the list is configured in your F<.ezmlm> file, it
+will download the emails add them to the appropriate maildir.
+
+    macro index ,zs "\
+    <pipe-message>mutt-ezmlm --from-email<enter>\
+    <delete-message>\
+    " "download bouncing emails from an ezmlm warning"
+
+=cut
