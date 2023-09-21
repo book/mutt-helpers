@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-use 5.028;
+use 5.030;
 use warnings;
 use experimental 'signatures';
 
@@ -33,12 +33,16 @@ $maildir =~ s{\A~/}{$ENV{HOME}/};
 my $nntp_server = $ezmlm->{_}{nntp}
   // die "No nntp server defined in $option{config}";
 
-my %group2list;
+my %item2list;
 for my $list ( grep $_ ne '_', keys %$ezmlm ) {
-    exists $ezmlm->{$list}{$_}
-      or die "No '$_' entry in section '$list' of '$option{config}'\n"
-      for qw( folder group );
-    $group2list{ $ezmlm->{$list}{group} } = $list;
+    for (qw( folder group )) {
+        die "No '$_' entry in section '$list' of '$option{config}'\n"
+          if !exists $ezmlm->{$list}{$_};
+        die "Mapping for '$ezmlm->{$list}{$_}' already exists in '$option{config}'\n"
+          if exists $item2list{ $ezmlm->{$list}{$_} }
+          && $item2list{ $ezmlm->{$list}{$_} } ne $list;
+        $item2list{ $ezmlm->{$list}{$_} } = $list;
+    }
 }
 
 # setup NNTP client
@@ -116,9 +120,9 @@ while ( my $arg = $next->() ) {
     # switch group and list
     else {
         my $list =
-            exists $ezmlm->{$arg}    ? $arg
-          : exists $group2list{$arg} ? $group2list{$arg}
-          : die "Unknown group or list '$arg' requested (not listed in '$option{config}')\n";
+            exists $ezmlm->{$arg}   ? $arg
+          : exists $item2list{$arg} ? $item2list{$arg}
+          : die "Unknown group/folder/list '$arg' requested (not listed in '$option{config}')\n";
         $config = $ezmlm->{$list};
         $nntp->group( $ezmlm->{$list}{group} );
     }
