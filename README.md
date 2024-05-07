@@ -7,6 +7,8 @@ This repository contains some helper scripts I use with
 * **mutt-ezmlm** is used to download email archives from ezmlm-managed
   newsgroups (see <https://www.nntp.perl.org> for an example)
   and save them in a Maildir
+* **received-summary** parses the `Received` headers to give a view of the
+  email's travels through mail servers
 
 # Links
 

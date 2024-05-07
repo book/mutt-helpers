@@ -1,0 +1,98 @@
+#!/usr/bin/env perl
+use 5.032;
+use warnings;
+
+use Getopt::Long;
+use Email::MIME;
+use DateTime::Format::Mail;
+
+# option processing
+my %option;
+GetOptions(
+    \%option,
+    'local!',    # show locatime
+    'help',      # help
+) or pod2usage(1);
+
+pod2usage(0) if $option{help};
+
+# mail received on STDIN
+my $email = Email::MIME->new(
+    do { local $/; scalar <> }
+);
+
+# as of 5.36, should be able to use experimental for_list
+my @received;
+{
+    my @headers = $email->header_pairs;
+    while ( my ( $k, $v ) = splice @headers, 0, 2 ) {
+        push @received, [ $k, $v ] if $k =~ /\AReceived(?:-SPF)?\z/i;
+    }
+}
+my $dfm = DateTime::Format::Mail->new( loose => 1 );
+
+my $written = do {
+    my $dt = $dfm->parse_datetime( $email->header('date') );
+    $option{local}
+      ? $dt->set_time_zone('local')->strftime('%a %Y-%m-%d %H:%M:%S')
+      : $dt->strftime('%a %Y-%m-%d %H:%M:%S %Z');
+};
+say join ' ', $written, $email->header('from'), '->', join ', ', $email->header('to'),
+  $email->header('cc');
+
+for my $received ( reverse @received ) {
+    my ( $key, $value ) = @$received;
+
+    # regular received header
+    if ( $key =~ /\Areceived\z/i ) {
+
+        # split the header
+        my ( $header, $date ) = split /; */, $value;
+
+        # 1. skip everything up to the first keyword or parens
+        $header =~ m/\G *(?=from|by|with|for|\()/gc;
+
+        # 2. skip any lone parenthetical block (qmail)
+        $header =~ m/\G\([^\)]*\) */gc;
+
+        # 3. grab the key/value pairs we care about
+        my ( %attr, $kw );
+        while ( pos($header) != length $header ) {
+
+            # 3.1 grab keyword
+            $header =~ m/\G(from|by|with|for) */gc and $kw = $1;
+
+            # 3.2 everything (including parenthesized text) up to next keyword
+            $header =~ /\G([^\(]*?(?:\([^)]*\) *)*)(?=from|by|with|for)?/gc
+              and $attr{$kw} .= $1;
+        }
+
+        # nothing interesting
+        next unless %attr;
+
+        # cleanup attributes
+        s/\A +| +\z//g for values %attr;
+        $attr{$_} //= '?' for qw( for from );
+
+        # compute date
+        $date = do {
+            $date =~ s/\(envelope-from [^\)]*\)//g; # drop extra garbage in the date field
+            my $dt =
+              eval { $dfm->parse_datetime($date) };
+              $dt
+              ? $option{local}
+                  ? $dt->set_time_zone('local')->strftime('%a %Y-%m-%d %H:%M:%S')
+                  : $dt->strftime('%a %Y-%m-%d %H:%M:%S %Z')
+              : "$date (invalid format)";
+        };
+
+        say "$date $attr{for} [ $attr{from} -> $attr{by} ]";
+    }
+    elsif ( $key =~ /\Areceived-spf\z/i ) {
+	 # TODO
+    }
+    else {
+        die "Unexpected header: $key";
+    }
+}
+
